@@ -502,6 +502,11 @@
                     this.map.setView([this.userPosition.lat, this.userPosition.lng], this.map.getZoom());
                 }
                 
+                // Periodically search for new level crossings as we move
+                if (this.demoStep % 25 === 0) { // Every 25 steps (~12.5 seconds)
+                    this.findLevelCrossings();
+                }
+                
                 this.demoStep++;
                 if (this.demoStep >= this.demoStepsPerSegment) {
                     this.demoStep = 0;
@@ -686,7 +691,7 @@
                     return;
                 }
                 
-                // Calculate distances and sort
+                // Calculate distances from current user position (works for both real GPS and demo)
                 const crossingsWithDistance = this.crossings.map(crossing => {
                     const distance = this.calculateDistance(
                         this.userPosition.lat, this.userPosition.lng,
@@ -766,7 +771,23 @@
                 return radians * (180 / Math.PI);
             }
             
-            updateDrawer() {
+            updateDrawer(customPeekText = null, customMessage = null) {
+                const peek = document.getElementById('drawerPeek');
+                const content = document.getElementById('drawerContent');
+                const demoNote = this.isDemoMode ? 
+                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 8px;\">🎯 Demo Mode</div>' : '';
+                
+                if (customPeekText && customMessage) {
+                    // Handle no crossings case
+                    peek.textContent = customPeekText;
+                    content.innerHTML = `
+                        <div class=\"distance-display\">${customPeekText}</div>
+                        <div class=\"status\">${customMessage}</div>
+                        ${demoNote}
+                    `;
+                    return;
+                }
+                
                 if (!this.nearestCrossing) return;
                 
                 const distance = this.nearestCrossing.distance;
@@ -776,14 +797,7 @@
                     `${(distance / 1000).toFixed(1)}km away`;
                 const direction = this.bearingToDirection(bearing);
                 
-                const peek = document.getElementById('drawerPeek');
-                const content = document.getElementById('drawerContent');
-                
                 peek.textContent = distanceText;
-                
-                const urlParams = new URLSearchParams(window.location.search);
-                const demoNote = urlParams.get('demo') === 'true' ? 
-                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 8px;\">🎯 Demo Mode</div>' : '';
                 
                 content.innerHTML = `
                     <div class=\"distance-display\">${distanceText}</div>
