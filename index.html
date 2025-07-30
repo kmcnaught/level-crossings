@@ -130,7 +130,7 @@
             border: 0.5px solid #2196F3;
             border-radius: 50%;
             opacity: 0.8;
-            animation: pulse-off-screen 8s infinite;
+            animation: pulse-off-screen 12s infinite;
         }
         
         @keyframes pulse-off-screen {
@@ -140,7 +140,7 @@
             }
             100% {
                 opacity: 0.2;
-                transform: translate(-50%, -50%) scale(50);
+                transform: translate(-50%, -50%) scale(25);
             }
         }
         
@@ -183,42 +183,6 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
-        /* Ring legend */
-        .ring-legend {
-            position: fixed;
-            bottom: 120px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            z-index: 600;
-            font-size: 12px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-        
-        .legend-ring {
-            width: 16px;
-            height: 16px;
-            border: 2px solid;
-            border-radius: 50%;
-            margin-right: 8px;
-            flex-shrink: 0;
-        }
-        
-        .legend-ring.on-screen {
-            border-color: #ff4757;
-        }
-        
-        .legend-ring.off-screen {
-            border-color: #2196F3;
-        }
         
         .hidden {
             display: none;
@@ -237,17 +201,6 @@
         <div id="scaleLabel" class="scale-label">1 km</div>
     </div>
     
-    <!-- Ring legend -->
-    <div id="ringLegend" class="ring-legend">
-        <div class="legend-item">
-            <div class="legend-ring on-screen"></div>
-            <span>On-screen</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-ring off-screen"></div>
-            <span>Off-screen</span>
-        </div>
-    </div>
     
     
     <!-- Bottom drawer -->
@@ -317,7 +270,7 @@
                 this.map.on('zoomend moveend', () => {
                     if (this.nearestCrossing) {
                         this.updateDistanceScale();
-                        this.updateOffScreenRingPositions();
+                        this.updateRingVisibility();
                     }
                 });
             }
@@ -604,7 +557,7 @@
                     
                     if (isVisible) {
                         // Create on-screen rings for visible crossings
-                        for (let i = 0; i < 4; i++) {
+                        for (let i = 0; i < 2; i++) {
                             const ring = L.divIcon({
                                 className: 'crossing-rings',
                                 html: `<div class=\"proximity-ring\" style=\"animation-duration: ${animationDuration}s; animation-delay: ${i * 0.8}s; width: 60px; height: 60px;\"></div>`,
@@ -650,15 +603,18 @@
                             elements: []
                         };
                         
-                        for (let i = 0; i < 4; i++) {
+                        // Off-screen rings use slower, fixed duration
+                        const offScreenDuration = 12;
+                        
+                        for (let i = 0; i < 2; i++) {
                             const ring = document.createElement('div');
                             ring.className = 'off-screen-ring';
                             ring.style.left = x + 'px';
                             ring.style.top = y + 'px';
                             ring.style.width = '30px';
                             ring.style.height = '30px';
-                            ring.style.animationDuration = animationDuration + 's';
-                            ring.style.animationDelay = (i * 0.8) + 's';
+                            ring.style.animationDuration = offScreenDuration + 's';
+                            ring.style.animationDelay = (i * 6) + 's'; // Second ring starts halfway through first
                             ring.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
                             ring.style.border = '0.5px solid #2196F3'; // Force blue color
                             ring.style.opacity = '0.8'; // Force visibility
@@ -674,22 +630,21 @@
                 
             }
             
-            updateOffScreenRingPositions() {
-                if (!this.offScreenRings.length || !this.userPosition) return;
+            updateRingVisibility() {
+                if (!this.allCrossings || !this.userPosition) return;
                 
+                const bounds = this.map.getBounds();
                 const screenWidth = window.innerWidth;
                 const screenHeight = window.innerHeight;
                 const screenCenter = { x: screenWidth / 2, y: screenHeight / 2 };
                 
+                // Update off-screen ring positions
                 this.offScreenRings.forEach(ringGroup => {
                     const crossing = ringGroup.crossing;
-                    
-                    // Check if crossing is still off-screen
-                    const bounds = this.map.getBounds();
                     const isVisible = bounds.contains([crossing.lat, crossing.lon]);
                     
                     if (!isVisible) {
-                        // Recalculate position
+                        // Update position for off-screen crossings
                         const bearing = this.calculateBearing(
                             this.userPosition.lat, this.userPosition.lng,
                             crossing.lat, crossing.lon
@@ -701,18 +656,98 @@
                         const x = screenCenter.x + Math.sin(angle) * distance;
                         const y = screenCenter.y - Math.cos(angle) * distance;
                         
-                        // Update position of all rings in this group without affecting animation
                         ringGroup.elements.forEach(ring => {
                             ring.style.left = x + 'px';
                             ring.style.top = y + 'px';
                         });
                     } else {
-                        // Crossing is now visible, remove off-screen rings
+                        // Crossing became visible, remove off-screen rings
                         ringGroup.elements.forEach(ring => ring.remove());
                         const index = this.offScreenRings.indexOf(ringGroup);
                         if (index > -1) {
                             this.offScreenRings.splice(index, 1);
                         }
+                        
+                        // Create on-screen rings for this crossing
+                        const urgency = Math.max(0.2, 1 - (crossing.distance / 80000));
+                        const animationDuration = 10 - (urgency * 4);
+                        
+                        for (let i = 0; i < 2; i++) {
+                            const ring = L.divIcon({
+                                className: 'crossing-rings',
+                                html: `<div class="proximity-ring" style="animation-duration: ${animationDuration}s; animation-delay: ${i * 0.8}s; width: 60px; height: 60px;"></div>`,
+                                iconSize: [60, 60],
+                                iconAnchor: [30, 30]
+                            });
+                            
+                            const marker = L.marker([crossing.lat, crossing.lon], { 
+                                icon: ring,
+                                interactive: false,
+                                keyboard: false
+                            }).addTo(this.map);
+                            
+                            this.crossingRings.push(marker);
+                        }
+                    }
+                });
+                
+                // Check for crossings that went from visible to off-screen
+                this.allCrossings.forEach((crossing, index) => {
+                    if (index > 2) return; // Only handle 3 nearest
+                    
+                    const isVisible = bounds.contains([crossing.lat, crossing.lon]);
+                    const hasOffScreenRings = this.offScreenRings.some(group => group.crossing === crossing);
+                    const hasOnScreenRings = this.crossingRings.some(marker => {
+                        const pos = marker.getLatLng();
+                        return Math.abs(pos.lat - crossing.lat) < 0.0001 && Math.abs(pos.lng - crossing.lon) < 0.0001;
+                    });
+                    
+                    if (!isVisible && !hasOffScreenRings && hasOnScreenRings) {
+                        // Remove on-screen rings and create off-screen rings
+                        this.crossingRings = this.crossingRings.filter(marker => {
+                            const pos = marker.getLatLng();
+                            if (Math.abs(pos.lat - crossing.lat) < 0.0001 && Math.abs(pos.lng - crossing.lon) < 0.0001) {
+                                this.map.removeLayer(marker);
+                                return false;
+                            }
+                            return true;
+                        });
+                        
+                        // Create off-screen rings
+                        const bearing = this.calculateBearing(
+                            this.userPosition.lat, this.userPosition.lng,
+                            crossing.lat, crossing.lon
+                        );
+                        
+                        const angle = bearing * (Math.PI / 180);
+                        const distance = Math.max(screenWidth, screenHeight) * 0.6;
+                        const x = screenCenter.x + Math.sin(angle) * distance;
+                        const y = screenCenter.y - Math.cos(angle) * distance;
+                        
+                        const ringGroup = { crossing: crossing, elements: [] };
+                        const offScreenContainer = document.getElementById('offScreenRings');
+                        
+                        // Off-screen rings use consistent slower timing
+                        const offScreenDuration = 12;
+                        
+                        for (let i = 0; i < 2; i++) {
+                            const ring = document.createElement('div');
+                            ring.className = 'off-screen-ring';
+                            ring.style.left = x + 'px';
+                            ring.style.top = y + 'px';
+                            ring.style.width = '30px';
+                            ring.style.height = '30px';
+                            ring.style.animationDuration = offScreenDuration + 's';
+                            ring.style.animationDelay = (i * 6) + 's';
+                            ring.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
+                            ring.style.border = '0.5px solid #2196F3';
+                            ring.style.opacity = '0.8';
+                            
+                            offScreenContainer.appendChild(ring);
+                            ringGroup.elements.push(ring);
+                        }
+                        
+                        this.offScreenRings.push(ringGroup);
                     }
                 });
             }
