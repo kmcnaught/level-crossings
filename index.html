@@ -23,48 +23,66 @@
             width: 100vw;
         }
         
-        .info-overlay {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
+        /* Bottom drawer */
+        .bottom-drawer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 10px;
-            padding: 15px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
             z-index: 1000;
-            font-size: 16px;
-            line-height: 1.4;
+            transition: transform 0.3s ease;
+            transform: translateY(calc(100% - 60px));
+        }
+        
+        .bottom-drawer.expanded {
+            transform: translateY(0);
+        }
+        
+        .drawer-handle {
+            width: 40px;
+            height: 4px;
+            background: #ccc;
+            border-radius: 2px;
+            margin: 12px auto;
+            cursor: pointer;
+        }
+        
+        .drawer-content {
+            padding: 0 20px 20px 20px;
+            text-align: center;
         }
         
         .distance-display {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             color: #333;
             margin-bottom: 5px;
         }
         
         .direction-display {
-            font-size: 18px;
+            font-size: 16px;
             color: #666;
         }
         
         .status {
-            font-size: 14px;
+            font-size: 12px;
             color: #888;
-            margin-top: 10px;
+            margin-top: 8px;
         }
         
-        .error {
-            background: rgba(255, 0, 0, 0.1);
-            border: 1px solid #ff6b6b;
-            color: #d63031;
-        }
-        
-        .loading {
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid #ffc107;
-            color: #e67e22;
+        .drawer-peek {
+            background: rgba(255, 255, 255, 0.9);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 8px 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
         }
         
         .crossing-marker {
@@ -77,236 +95,112 @@
         }
         
         .ui-toggle {
-            position: absolute;
+            position: fixed;
             top: 20px;
             right: 20px;
             background: rgba(255, 255, 255, 0.9);
             border: none;
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 50%;
+            padding: 0;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             z-index: 1001;
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
+            font-size: 20px;
             cursor: pointer;
             touch-action: manipulation;
-            min-width: 44px;
-            min-height: 44px;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .ui-toggle:hover {
             background: rgba(255, 255, 255, 1);
         }
         
-        /* Compass Arrow */
-        .compass-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 10px 0;
+        /* Map overlays */
+        .map-overlay {
+            position: fixed;
+            z-index: 500;
+            pointer-events: none;
+        }
+        
+        /* Compass overlay (center of screen) */
+        .compass-overlay {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 6px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
         }
         
         .compass-arrow {
-            width: 60px;
-            height: 60px;
-            margin-right: 15px;
-            position: relative;
-            border: 3px solid #ddd;
-            border-radius: 50%;
-            background: #f8f9fa;
-        }
-        
-        .arrow {
             position: absolute;
             top: 50%;
             left: 50%;
-            transform-origin: center;
-            width: 4px;
-            height: 25px;
-            background: #ff4757;
-            transform: translate(-50%, -50%);
-            transition: transform 0.3s ease;
-        }
-        
-        .arrow::before {
-            content: '';
-            position: absolute;
-            top: -8px;
-            left: -6px;
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-bottom: 12px solid #ff4757;
-        }
-        
-        /* Radar Circles */
-        .radar-container {
-            width: 120px;
-            height: 120px;
-            margin: 10px auto;
-            position: relative;
-            border: 2px solid #ddd;
-            border-radius: 50%;
-            background: #f8f9fa;
-        }
-        
-        .radar-ring {
-            position: absolute;
-            border: 1px solid #ccc;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        
-        .radar-ring:nth-child(1) { width: 30px; height: 30px; }
-        .radar-ring:nth-child(2) { width: 60px; height: 60px; }
-        .radar-ring:nth-child(3) { width: 90px; height: 90px; }
-        
-        .radar-dot {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            background: #ff4757;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            transition: all 0.3s ease;
-        }
-        
-        .radar-center {
-            position: absolute;
             width: 8px;
-            height: 8px;
-            background: #2c5aa0;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        
-        /* Distance Bar */
-        .distance-bar-container {
-            margin: 15px 0;
-        }
-        
-        .distance-bar-bg {
-            width: 100%;
-            height: 20px;
-            background: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative;
-        }
-        
-        .distance-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #28a745 0%, #ffc107 50%, #dc3545 100%);
-            border-radius: 10px;
-            transition: width 0.5s ease;
-        }
-        
-        .distance-bar-arrow {
-            position: absolute;
-            right: -30px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 0;
-            height: 0;
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-left: 15px solid #333;
-            transition: transform 0.3s ease;
-        }
-        
-        /* Clock Face */
-        .clock-container {
-            width: 100px;
-            height: 100px;
-            margin: 10px auto;
-            position: relative;
-            border: 3px solid #333;
-            border-radius: 50%;
-            background: #fff;
-        }
-        
-        .clock-marker {
-            position: absolute;
-            width: 2px;
-            height: 8px;
-            background: #666;
-            top: 2px;
-            left: 50%;
-            transform-origin: 50% 47px;
-            transform: translateX(-50%);
-        }
-        
-        .clock-marker:nth-child(1) { transform: translateX(-50%) rotate(0deg); }
-        .clock-marker:nth-child(2) { transform: translateX(-50%) rotate(30deg); }
-        .clock-marker:nth-child(3) { transform: translateX(-50%) rotate(60deg); }
-        .clock-marker:nth-child(4) { transform: translateX(-50%) rotate(90deg); }
-        .clock-marker:nth-child(5) { transform: translateX(-50%) rotate(120deg); }
-        .clock-marker:nth-child(6) { transform: translateX(-50%) rotate(150deg); }
-        .clock-marker:nth-child(7) { transform: translateX(-50%) rotate(180deg); }
-        .clock-marker:nth-child(8) { transform: translateX(-50%) rotate(210deg); }
-        .clock-marker:nth-child(9) { transform: translateX(-50%) rotate(240deg); }
-        .clock-marker:nth-child(10) { transform: translateX(-50%) rotate(270deg); }
-        .clock-marker:nth-child(11) { transform: translateX(-50%) rotate(300deg); }
-        .clock-marker:nth-child(12) { transform: translateX(-50%) rotate(330deg); }
-        
-        .clock-hand {
-            position: absolute;
-            width: 4px;
-            height: 35px;
+            height: 70px;
             background: #ff4757;
-            top: 50%;
-            left: 50%;
             transform-origin: center bottom;
             transform: translate(-50%, -100%);
             transition: transform 0.3s ease;
-            border-radius: 2px;
+            border-radius: 4px;
         }
         
-        .clock-center {
+        .compass-arrow::before {
+            content: '';
             position: absolute;
-            width: 10px;
-            height: 10px;
-            background: #333;
-            border-radius: 50%;
+            top: -15px;
+            left: -12px;
+            width: 0;
+            height: 0;
+            border-left: 16px solid transparent;
+            border-right: 16px solid transparent;
+            border-bottom: 24px solid #ff4757;
+        }
+        
+        .compass-center {
+            position: absolute;
             top: 50%;
             left: 50%;
+            width: 16px;
+            height: 16px;
+            background: #333;
+            border-radius: 50%;
             transform: translate(-50%, -50%);
         }
         
-        /* Proximity Rings */
-        .proximity-container {
-            position: relative;
-            display: inline-block;
+        
+        /* Proximity rings on crossings */
+        .crossing-rings {
+            position: absolute;
+            pointer-events: none;
         }
         
         .proximity-ring {
             position: absolute;
-            border: 2px solid #ff4757;
+            border: 3px solid #ff4757;
             border-radius: 50%;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            animation: pulse 2s infinite;
+            animation: pulse-ring 2s infinite;
         }
         
-        @keyframes pulse {
+        @keyframes pulse-ring {
             0% {
                 opacity: 1;
-                transform: translate(-50%, -50%) scale(0.8);
+                transform: translate(-50%, -50%) scale(0.1);
             }
             100% {
                 opacity: 0;
-                transform: translate(-50%, -50%) scale(1.5);
+                transform: translate(-50%, -50%) scale(4);
             }
         }
+        
         
         .hidden {
             display: none;
@@ -315,10 +209,28 @@
 </head>
 <body>
     <div id="map"></div>
-    <div id="info" class="info-overlay loading">
-        <div class="distance-display">Locating...</div>
-        <div class="status">Getting your position...</div>
+    
+    <!-- Map overlays -->
+    <div id="compassOverlay" class="map-overlay compass-overlay hidden">
+        <div class="compass-arrow"></div>
+        <div class="compass-center"></div>
     </div>
+    
+    
+    <!-- Bottom drawer -->
+    <div id="bottomDrawer" class="bottom-drawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-peek">
+            <span id="drawerPeek">Locating...</span>
+        </div>
+        <div class="drawer-content">
+            <div id="drawerContent">
+                <div class="distance-display">Getting your position...</div>
+                <div class="status">Initializing...</div>
+            </div>
+        </div>
+    </div>
+    
     <button id="uiToggle" class="ui-toggle" title="Toggle UI Style">🎯</button>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -328,13 +240,15 @@
                 this.map = null;
                 this.userMarker = null;
                 this.crossingMarkers = [];
+                this.crossingRings = [];
                 this.userPosition = null;
                 this.crossings = [];
                 this.cache = new Map();
                 this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
-                this.uiModes = ['text', 'compass', 'radar', 'bar', 'clock', 'rings'];
+                this.uiModes = ['none', 'compass', 'rings'];
                 this.currentModeIndex = 0;
                 this.nearestCrossing = null;
+                this.drawerExpanded = false;
                 
                 this.init();
             }
@@ -343,16 +257,29 @@
                 this.initMap();
                 this.getUserLocation();
                 this.setupUIToggle();
+                this.setupDrawer();
             }
             
             setupUIToggle() {
                 const toggle = document.getElementById('uiToggle');
                 toggle.addEventListener('click', () => {
                     this.currentModeIndex = (this.currentModeIndex + 1) % this.uiModes.length;
-                    if (this.nearestCrossing) {
-                        this.updateDisplayWithMode();
-                    }
+                    this.updateDisplayWithMode();
                 });
+            }
+            
+            setupDrawer() {
+                const drawer = document.getElementById('bottomDrawer');
+                const handle = drawer.querySelector('.drawer-handle');
+                const peek = drawer.querySelector('.drawer-peek');
+                
+                const toggleDrawer = () => {
+                    this.drawerExpanded = !this.drawerExpanded;
+                    drawer.classList.toggle('expanded', this.drawerExpanded);
+                };
+                
+                handle.addEventListener('click', toggleDrawer);
+                peek.addEventListener('click', toggleDrawer);
             }
             
             initMap() {
@@ -495,12 +422,14 @@
             processCrossings(data) {
                 this.crossings = data.elements || [];
                 
-                // Clear existing markers
+                // Clear existing markers and rings
                 this.crossingMarkers.forEach(marker => this.map.removeLayer(marker));
+                this.crossingRings.forEach(ring => this.map.removeLayer(ring));
                 this.crossingMarkers = [];
+                this.crossingRings = [];
                 
                 if (this.crossings.length === 0) {
-                    this.updateDisplay('No level crossings found within 10km', '');
+                    this.updateDrawer('No level crossings found within 10km', 'Try moving to a different area');
                     return;
                 }
                 
@@ -538,6 +467,7 @@
                 
                 // Store nearest crossing info
                 this.nearestCrossing = crossingsWithDistance[0];
+                this.allCrossings = crossingsWithDistance;
                 this.updateDisplayWithMode();
             }
             
@@ -591,154 +521,90 @@
                     `${(distance / 1000).toFixed(1)}km away`;
                 const direction = this.bearingToDirection(bearing);
                 
-                const info = document.getElementById('info');
-                info.className = 'info-overlay';
+                // Hide all overlays first
+                this.hideAllOverlays();
+                
+                const mode = this.uiModes[this.currentModeIndex];
+                
+                // Update drawer
+                this.updateDrawer(distanceText, `${direction} • ${mode} mode`);
+                
+                // Show appropriate overlay
+                switch(mode) {
+                    case 'compass':
+                        this.showCompassOverlay(bearing);
+                        break;
+                    case 'rings':
+                        this.showRingsOverlay();
+                        break;
+                }
+            }
+            
+            hideAllOverlays() {
+                document.getElementById('compassOverlay').classList.add('hidden');
+                
+                // Remove existing rings
+                this.crossingRings.forEach(ring => this.map.removeLayer(ring));
+                this.crossingRings = [];
+            }
+            
+            showCompassOverlay(bearing) {
+                const overlay = document.getElementById('compassOverlay');
+                const arrow = overlay.querySelector('.compass-arrow');
+                arrow.style.transform = `translate(-50%, -100%) rotate(${bearing}deg)`;
+                overlay.classList.remove('hidden');
+            }
+            
+            
+            showRingsOverlay() {
+                if (!this.allCrossings) return;
+                
+                // Add pulsing rings to each crossing
+                this.allCrossings.forEach((crossing, index) => {
+                    if (index > 4) return; // Show rings for 5 nearest crossings
+                    
+                    const urgency = Math.max(0.3, 1 - (crossing.distance / 8000));
+                    const animationDuration = 6 - (urgency * 3); // Slower: 3-6 seconds instead of 1-3
+                    
+                    // Create multiple rings for pulse effect
+                    for (let i = 0; i < 4; i++) {
+                        const ring = L.divIcon({
+                            className: 'crossing-rings',
+                            html: `<div class=\"proximity-ring\" style=\"animation-duration: ${animationDuration}s; animation-delay: ${i * 0.5}s; width: 60px; height: 60px;\"></div>`,
+                            iconSize: [60, 60],
+                            iconAnchor: [30, 30]
+                        });
+                        
+                        const marker = L.marker([crossing.lat, crossing.lon], { icon: ring }).addTo(this.map);
+                        this.crossingRings.push(marker);
+                    }
+                });
+            }
+            
+            updateDrawer(distance, info) {
+                const peek = document.getElementById('drawerPeek');
+                const content = document.getElementById('drawerContent');
+                
+                peek.textContent = distance;
                 
                 const urlParams = new URLSearchParams(window.location.search);
                 const demoNote = urlParams.get('demo') === 'true' ? 
-                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 5px;\">🎯 Demo Mode</div>' : '';
+                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 8px;\">🎯 Demo Mode</div>' : '';
                 
-                const mode = this.uiModes[this.currentModeIndex];
-                let modeContent = '';
-                
-                switch(mode) {
-                    case 'text':
-                        modeContent = `
-                            <div class=\"distance-display\">${distanceText}</div>
-                            <div class=\"direction-display\">${direction} (${Math.round(bearing)}°)</div>
-                        `;
-                        break;
-                        
-                    case 'compass':
-                        modeContent = this.generateCompassUI(distanceText, bearing);
-                        break;
-                        
-                    case 'radar':
-                        modeContent = this.generateRadarUI(distanceText, bearing, distance);
-                        break;
-                        
-                    case 'bar':
-                        modeContent = this.generateBarUI(distanceText, bearing, distance);
-                        break;
-                        
-                    case 'clock':
-                        modeContent = this.generateClockUI(distanceText, bearing);
-                        break;
-                        
-                    case 'rings':
-                        modeContent = this.generateRingsUI(distanceText, distance);
-                        break;
-                }
-                
-                info.innerHTML = `
-                    ${modeContent}
-                    <div class=\"status\">Found ${this.crossings.length} crossing(s) nearby • Mode: ${mode}</div>
+                content.innerHTML = `
+                    <div class=\"distance-display\">${distance}</div>
+                    <div class=\"direction-display\">${info}</div>
+                    <div class=\"status\">Found ${this.crossings.length} crossing(s) nearby</div>
                     ${demoNote}
                 `;
             }
             
-            generateCompassUI(distanceText, bearing) {
-                return `
-                    <div class=\"compass-container\">
-                        <div class=\"compass-arrow\">
-                            <div class=\"arrow\" style=\"transform: translate(-50%, -50%) rotate(${bearing}deg)\"></div>
-                        </div>
-                        <div>
-                            <div class=\"distance-display\">${distanceText}</div>
-                            <div class=\"direction-display\">Level Crossing</div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            generateRadarUI(distanceText, bearing, distance) {
-                const maxDistance = 10000; // 10km
-                const radius = Math.min(45, (distance / maxDistance) * 45);
-                const angle = bearing * (Math.PI / 180);
-                const x = Math.sin(angle) * radius + 60;
-                const y = 60 - Math.cos(angle) * radius;
-                
-                return `
-                    <div class=\"distance-display\">${distanceText}</div>
-                    <div class=\"radar-container\">
-                        <div class=\"radar-ring\"></div>
-                        <div class=\"radar-ring\"></div>
-                        <div class=\"radar-ring\"></div>
-                        <div class=\"radar-center\"></div>
-                        <div class=\"radar-dot\" style=\"left: ${x}px; top: ${y}px;\"></div>
-                    </div>
-                `;
-            }
-            
-            generateBarUI(distanceText, bearing, distance) {
-                const maxDistance = 10000;
-                const proximityPercent = Math.max(10, 100 - (distance / maxDistance * 90));
-                
-                return `
-                    <div class=\"distance-display\">${distanceText}</div>
-                    <div class=\"distance-bar-container\">
-                        <div class=\"distance-bar-bg\">
-                            <div class=\"distance-bar-fill\" style=\"width: ${proximityPercent}%\"></div>
-                            <div class=\"distance-bar-arrow\" style=\"transform: translateY(-50%) rotate(${bearing}deg)\"></div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            generateClockUI(distanceText, bearing) {
-                const clockRotation = bearing - 90; // Adjust for 12 o'clock being 0 degrees
-                
-                return `
-                    <div class=\"distance-display\">${distanceText}</div>
-                    <div class=\"clock-container\">
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-marker\"></div>
-                        <div class=\"clock-hand\" style=\"transform: translate(-50%, -100%) rotate(${clockRotation}deg)\"></div>
-                        <div class=\"clock-center\"></div>
-                    </div>
-                `;
-            }
-            
-            generateRingsUI(distanceText, distance) {
-                const urgency = Math.max(0.5, 1 - (distance / 5000));
-                const animationDuration = 3 - (urgency * 2);
-                
-                return `
-                    <div class=\"proximity-container\">
-                        <div class=\"distance-display\">${distanceText}</div>
-                        <div class=\"proximity-ring\" style=\"animation-duration: ${animationDuration}s; width: 60px; height: 60px;\"></div>
-                        <div class=\"proximity-ring\" style=\"animation-duration: ${animationDuration}s; animation-delay: 0.3s; width: 60px; height: 60px;\"></div>
-                        <div class=\"proximity-ring\" style=\"animation-duration: ${animationDuration}s; animation-delay: 0.6s; width: 60px; height: 60px;\"></div>
-                    </div>
-                `;
-            }
-            
             updateStatus(message) {
-                const info = document.getElementById('info');
-                info.className = 'info-overlay loading';
-                info.innerHTML = `
-                    <div class="distance-display">Searching...</div>
-                    <div class="status">${message}</div>
-                `;
+                this.updateDrawer('Searching...', message);
             }
             
             showError(message) {
-                const info = document.getElementById('info');
-                info.className = 'info-overlay error';
-                info.innerHTML = `
-                    <div class="distance-display">Error</div>
-                    <div class="status">${message}</div>
-                `;
+                this.updateDrawer('Error', message);
             }
         }
         
