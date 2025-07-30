@@ -542,9 +542,20 @@
                 this.clearRings();
                 const offScreenContainer = document.getElementById('offScreenRings');
                 
-                // Add pulsing rings to each of the 3 nearest crossings
-                this.allCrossings.forEach((crossing, index) => {
-                    if (index > 2) return; // Show rings for 3 nearest crossings only
+                // Get current map center for distance calculations
+                const mapCenter = this.map.getCenter();
+                
+                // Calculate distances from map center and get 3 nearest
+                const crossingsFromMapCenter = this.allCrossings.map(crossing => {
+                    const distanceFromCenter = this.calculateDistance(
+                        mapCenter.lat, mapCenter.lng,
+                        crossing.lat, crossing.lon
+                    );
+                    return { ...crossing, distanceFromCenter };
+                }).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter).slice(0, 3);
+                
+                // Add pulsing rings to each of the 3 nearest crossings to map center
+                crossingsFromMapCenter.forEach((crossing, index) => {
                     
                     const urgency = Math.max(0.2, 1 - (crossing.distance / 80000)); // Scale for 50-mile range
                     const animationDuration = 10 - (urgency * 4); // Much slower: 6-10 seconds
@@ -553,10 +564,10 @@
                     const bounds = this.map.getBounds();
                     const isVisible = bounds.contains([crossing.lat, crossing.lon]);
                     
-                    console.log(`Crossing ${index + 1}: ${(crossing.distance/1000).toFixed(1)}km, visible: ${isVisible}, lat: ${crossing.lat}, lon: ${crossing.lon}`);
+                    console.log(`Crossing ${index + 1} of ${crossingsFromMapCenter.length}: ${(crossing.distance/1000).toFixed(1)}km, visible: ${isVisible}, lat: ${crossing.lat}, lon: ${crossing.lon}`);
                     
                     if (isVisible) {
-                        // Create on-screen rings for visible crossings
+                        // Create on-screen rings for visible crossings (2 animated rings per crossing)
                         for (let i = 0; i < 2; i++) {
                             const ring = L.divIcon({
                                 className: 'crossing-rings',
@@ -575,9 +586,9 @@
                         }
                     } else {
                         // Create off-screen concentric rings that expand toward the screen
-                        const userPos = this.userPosition;
+                        const mapCenter = this.map.getCenter();
                         const bearing = this.calculateBearing(
-                            userPos.lat, userPos.lng,
+                            mapCenter.lat, mapCenter.lng,
                             crossing.lat, crossing.lon
                         );
                         
@@ -631,125 +642,10 @@
             }
             
             updateRingVisibility() {
-                if (!this.allCrossings || !this.userPosition) return;
+                if (!this.allCrossings) return;
                 
-                const bounds = this.map.getBounds();
-                const screenWidth = window.innerWidth;
-                const screenHeight = window.innerHeight;
-                const screenCenter = { x: screenWidth / 2, y: screenHeight / 2 };
-                
-                // Update off-screen ring positions
-                this.offScreenRings.forEach(ringGroup => {
-                    const crossing = ringGroup.crossing;
-                    const isVisible = bounds.contains([crossing.lat, crossing.lon]);
-                    
-                    if (!isVisible) {
-                        // Update position for off-screen crossings
-                        const bearing = this.calculateBearing(
-                            this.userPosition.lat, this.userPosition.lng,
-                            crossing.lat, crossing.lon
-                        );
-                        
-                        const angle = bearing * (Math.PI / 180);
-                        const distance = Math.max(screenWidth, screenHeight) * 0.6;
-                        
-                        const x = screenCenter.x + Math.sin(angle) * distance;
-                        const y = screenCenter.y - Math.cos(angle) * distance;
-                        
-                        ringGroup.elements.forEach(ring => {
-                            ring.style.left = x + 'px';
-                            ring.style.top = y + 'px';
-                        });
-                    } else {
-                        // Crossing became visible, remove off-screen rings
-                        ringGroup.elements.forEach(ring => ring.remove());
-                        const index = this.offScreenRings.indexOf(ringGroup);
-                        if (index > -1) {
-                            this.offScreenRings.splice(index, 1);
-                        }
-                        
-                        // Create on-screen rings for this crossing
-                        const urgency = Math.max(0.2, 1 - (crossing.distance / 80000));
-                        const animationDuration = 10 - (urgency * 4);
-                        
-                        for (let i = 0; i < 2; i++) {
-                            const ring = L.divIcon({
-                                className: 'crossing-rings',
-                                html: `<div class="proximity-ring" style="animation-duration: ${animationDuration}s; animation-delay: ${i * 0.8}s; width: 60px; height: 60px;"></div>`,
-                                iconSize: [60, 60],
-                                iconAnchor: [30, 30]
-                            });
-                            
-                            const marker = L.marker([crossing.lat, crossing.lon], { 
-                                icon: ring,
-                                interactive: false,
-                                keyboard: false
-                            }).addTo(this.map);
-                            
-                            this.crossingRings.push(marker);
-                        }
-                    }
-                });
-                
-                // Check for crossings that went from visible to off-screen
-                this.allCrossings.forEach((crossing, index) => {
-                    if (index > 2) return; // Only handle 3 nearest
-                    
-                    const isVisible = bounds.contains([crossing.lat, crossing.lon]);
-                    const hasOffScreenRings = this.offScreenRings.some(group => group.crossing === crossing);
-                    const hasOnScreenRings = this.crossingRings.some(marker => {
-                        const pos = marker.getLatLng();
-                        return Math.abs(pos.lat - crossing.lat) < 0.0001 && Math.abs(pos.lng - crossing.lon) < 0.0001;
-                    });
-                    
-                    if (!isVisible && !hasOffScreenRings && hasOnScreenRings) {
-                        // Remove on-screen rings and create off-screen rings
-                        this.crossingRings = this.crossingRings.filter(marker => {
-                            const pos = marker.getLatLng();
-                            if (Math.abs(pos.lat - crossing.lat) < 0.0001 && Math.abs(pos.lng - crossing.lon) < 0.0001) {
-                                this.map.removeLayer(marker);
-                                return false;
-                            }
-                            return true;
-                        });
-                        
-                        // Create off-screen rings
-                        const bearing = this.calculateBearing(
-                            this.userPosition.lat, this.userPosition.lng,
-                            crossing.lat, crossing.lon
-                        );
-                        
-                        const angle = bearing * (Math.PI / 180);
-                        const distance = Math.max(screenWidth, screenHeight) * 0.6;
-                        const x = screenCenter.x + Math.sin(angle) * distance;
-                        const y = screenCenter.y - Math.cos(angle) * distance;
-                        
-                        const ringGroup = { crossing: crossing, elements: [] };
-                        const offScreenContainer = document.getElementById('offScreenRings');
-                        
-                        // Off-screen rings use consistent slower timing
-                        const offScreenDuration = 12;
-                        
-                        for (let i = 0; i < 2; i++) {
-                            const ring = document.createElement('div');
-                            ring.className = 'off-screen-ring';
-                            ring.style.left = x + 'px';
-                            ring.style.top = y + 'px';
-                            ring.style.width = '30px';
-                            ring.style.height = '30px';
-                            ring.style.animationDuration = offScreenDuration + 's';
-                            ring.style.animationDelay = (i * 6) + 's';
-                            ring.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
-                            ring.style.border = '0.5px solid #2196F3';
-                            ring.style.opacity = '0.8';
-                            
-                            offScreenContainer.appendChild(ring);
-                            ringGroup.elements.push(ring);
-                        }
-                        
-                        this.offScreenRings.push(ringGroup);
-                    }
-                });
+                // Just refresh all rings based on current map position
+                this.showRingsOverlay();
             }
             
             updateStatus(message) {
