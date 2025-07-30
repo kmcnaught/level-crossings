@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level Crossing Proximity</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        .info-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        
+        .distance-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .direction-display {
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .status {
+            font-size: 14px;
+            color: #888;
+            margin-top: 10px;
+        }
+        
+        .error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff6b6b;
+            color: #d63031;
+        }
+        
+        .loading {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid #ffc107;
+            color: #e67e22;
+        }
+        
+        .crossing-marker {
+            background: #ff4757;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info" class="info-overlay loading">
+        <div class="distance-display">Locating...</div>
+        <div class="status">Getting your position...</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        class LevelCrossingApp {
+            constructor() {
+                this.map = null;
+                this.userMarker = null;
+                this.crossingMarkers = [];
+                this.userPosition = null;
+                this.crossings = [];
+                this.cache = new Map();
+                this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+                
+                this.init();
+            }
+            
+            init() {
+                this.initMap();
+                this.getUserLocation();
+            }
+            
+            initMap() {
+                this.map = L.map('map').setView([51.505, -0.09], 13);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(this.map);
+            }
+            
+            getUserLocation() {
+                if (!navigator.geolocation) {
+                    this.showError('Geolocation not supported');
+                    return;
+                }
+                
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 30000
+                };
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => this.onLocationSuccess(position),
+                    (error) => this.onLocationError(error),
+                    options
+                );
+            }
+            
+            onLocationSuccess(position) {
+                this.userPosition = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                this.map.setView([this.userPosition.lat, this.userPosition.lng], 15);
+                
+                // Add user marker
+                if (this.userMarker) {
+                    this.map.removeLayer(this.userMarker);
+                }
+                
+                this.userMarker = L.marker([this.userPosition.lat, this.userPosition.lng])
+                    .addTo(this.map)
+                    .bindPopup('Your location');
+                
+                this.updateStatus('Searching for level crossings...');
+                this.findLevelCrossings();
+            }
+            
+            onLocationError(error) {
+                let message = 'Location error: ';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        message += 'Permission denied';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        message += 'Position unavailable';
+                        break;
+                    case error.TIMEOUT:
+                        message += 'Request timeout';
+                        break;
+                    default:
+                        message += 'Unknown error';
+                }
+                this.showError(message);
+            }
+            
+            async findLevelCrossings() {
+                const radius = 0.09; // ~10km in degrees
+                const bbox = [
+                    this.userPosition.lat - radius,
+                    this.userPosition.lng - radius,
+                    this.userPosition.lat + radius,
+                    this.userPosition.lng + radius
+                ].join(',');
+                
+                const cacheKey = `crossings_${bbox}`;
+                const cached = this.cache.get(cacheKey);
+                
+                if (cached && (Date.now() - cached.timestamp < this.cacheTimeout)) {
+                    this.processCrossings(cached.data);
+                    return;
+                }
+                
+                const query = `
+                [out:json][timeout:10];
+                (
+                  node["railway"="level_crossing"](${bbox});
+                );
+                out geom;
+                `;
+                
+                try {
+                    const response = await fetch('https://overpass-api.de/api/interpreter', {
+                        method: 'POST',
+                        body: query
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    this.cache.set(cacheKey, {
+                        data: data,
+                        timestamp: Date.now()
+                    });
+                    
+                    this.processCrossings(data);
+                    
+                } catch (error) {
+                    this.showError(`Failed to fetch crossings: ${error.message}`);
+                }
+            }
+            
+            processCrossings(data) {
+                this.crossings = data.elements || [];
+                
+                // Clear existing markers
+                this.crossingMarkers.forEach(marker => this.map.removeLayer(marker));
+                this.crossingMarkers = [];
+                
+                if (this.crossings.length === 0) {
+                    this.updateDisplay('No level crossings found within 10km', '');
+                    return;
+                }
+                
+                // Calculate distances and sort
+                const crossingsWithDistance = this.crossings.map(crossing => {
+                    const distance = this.calculateDistance(
+                        this.userPosition.lat, this.userPosition.lng,
+                        crossing.lat, crossing.lon
+                    );
+                    const bearing = this.calculateBearing(
+                        this.userPosition.lat, this.userPosition.lng,
+                        crossing.lat, crossing.lon
+                    );
+                    
+                    return { ...crossing, distance, bearing };
+                }).sort((a, b) => a.distance - b.distance);
+                
+                // Add markers for all crossings
+                crossingsWithDistance.forEach((crossing, index) => {
+                    const marker = L.marker([crossing.lat, crossing.lon], {
+                        icon: L.divIcon({
+                            className: 'crossing-marker',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(this.map);
+                    
+                    const distanceText = crossing.distance < 1000 ? 
+                        `${Math.round(crossing.distance)}m` : 
+                        `${(crossing.distance / 1000).toFixed(1)}km`;
+                    
+                    marker.bindPopup(`Level Crossing<br>Distance: ${distanceText}`);
+                    this.crossingMarkers.push(marker);
+                });
+                
+                // Display nearest crossing info
+                const nearest = crossingsWithDistance[0];
+                const distanceText = nearest.distance < 1000 ? 
+                    `${Math.round(nearest.distance)}m away` : 
+                    `${(nearest.distance / 1000).toFixed(1)}km away`;
+                
+                const direction = this.bearingToDirection(nearest.bearing);
+                
+                this.updateDisplay(distanceText, `${direction} (${Math.round(nearest.bearing)}°)`);
+            }
+            
+            calculateDistance(lat1, lng1, lat2, lng2) {
+                const R = 6371000; // Earth's radius in meters
+                const dLat = this.toRadians(lat2 - lat1);
+                const dLng = this.toRadians(lng2 - lng1);
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                         Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+                         Math.sin(dLng/2) * Math.sin(dLng/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+            
+            calculateBearing(lat1, lng1, lat2, lng2) {
+                const dLng = this.toRadians(lng2 - lng1);
+                const lat1Rad = this.toRadians(lat1);
+                const lat2Rad = this.toRadians(lat2);
+                
+                const y = Math.sin(dLng) * Math.cos(lat2Rad);
+                const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+                         Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+                
+                let bearing = Math.atan2(y, x);
+                bearing = this.toDegrees(bearing);
+                return (bearing + 360) % 360;
+            }
+            
+            bearingToDirection(bearing) {
+                const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+                const index = Math.round(bearing / 22.5) % 16;
+                return directions[index];
+            }
+            
+            toRadians(degrees) {
+                return degrees * (Math.PI / 180);
+            }
+            
+            toDegrees(radians) {
+                return radians * (180 / Math.PI);
+            }
+            
+            updateDisplay(distance, direction) {
+                const info = document.getElementById('info');
+                info.className = 'info-overlay';
+                info.innerHTML = `
+                    <div class="distance-display">${distance}</div>
+                    <div class="direction-display">${direction}</div>
+                    <div class="status">Found ${this.crossings.length} crossing(s) nearby</div>
+                `;
+            }
+            
+            updateStatus(message) {
+                const info = document.getElementById('info');
+                info.className = 'info-overlay loading';
+                info.innerHTML = `
+                    <div class="distance-display">Searching...</div>
+                    <div class="status">${message}</div>
+                `;
+            }
+            
+            showError(message) {
+                const info = document.getElementById('info');
+                info.className = 'info-overlay error';
+                info.innerHTML = `
+                    <div class="distance-display">Error</div>
+                    <div class="status">${message}</div>
+                `;
+            }
+        }
+        
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new LevelCrossingApp();
+        });
+    </script>
+</body>
+</html>
