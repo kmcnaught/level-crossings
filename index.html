@@ -94,84 +94,7 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
         
-        .ui-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 50%;
-            padding: 0;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            z-index: 1001;
-            font-size: 20px;
-            cursor: pointer;
-            touch-action: manipulation;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
         
-        .ui-toggle:hover {
-            background: rgba(255, 255, 255, 1);
-        }
-        
-        /* Map overlays */
-        .map-overlay {
-            position: fixed;
-            z-index: 500;
-            pointer-events: none;
-        }
-        
-        /* Compass overlay (center of screen) */
-        .compass-overlay {
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 200px;
-            height: 200px;
-            border: 6px solid rgba(255, 255, 255, 0.9);
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-        }
-        
-        .compass-arrow {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 8px;
-            height: 70px;
-            background: #ff4757;
-            transform-origin: center bottom;
-            transform: translate(-50%, -100%);
-            transition: transform 0.3s ease;
-            border-radius: 4px;
-        }
-        
-        .compass-arrow::before {
-            content: '';
-            position: absolute;
-            top: -15px;
-            left: -12px;
-            width: 0;
-            height: 0;
-            border-left: 16px solid transparent;
-            border-right: 16px solid transparent;
-            border-bottom: 24px solid #ff4757;
-        }
-        
-        .compass-center {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 16px;
-            height: 16px;
-            background: #333;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-        }
         
         
         /* Proximity rings on crossings */
@@ -199,33 +122,25 @@
             height: 100vh;
             pointer-events: none;
             z-index: 450;
+            overflow: hidden;
         }
         
-        .ring-indicator {
+        .off-screen-ring {
             position: absolute;
-            width: 12px;
-            height: 12px;
-            background: #ff4757;
-            border: 2px solid white;
+            border: 3px solid #ff4757;
             border-radius: 50%;
-            animation: pulse-indicator 4s infinite;
+            opacity: 0.7;
+            animation: pulse-off-screen 8s infinite;
         }
         
-        @keyframes pulse-indicator {
+        @keyframes pulse-off-screen {
             0% {
-                opacity: 1;
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7);
-            }
-            70% {
-                opacity: 1;
-                transform: scale(1.2);
-                box-shadow: 0 0 0 15px rgba(255, 71, 87, 0);
+                opacity: 0.8;
+                transform: translate(-50%, -50%) scale(0.1);
             }
             100% {
-                opacity: 1;
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 71, 87, 0);
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(8);
             }
         }
         
@@ -249,12 +164,6 @@
 <body>
     <div id="map"></div>
     
-    <!-- Map overlays -->
-    <div id="compassOverlay" class="map-overlay compass-overlay hidden">
-        <div class="compass-arrow"></div>
-        <div class="compass-center"></div>
-    </div>
-    
     <!-- Off-screen ring indicators -->
     <div id="offScreenRings" class="off-screen-rings"></div>
     
@@ -273,7 +182,6 @@
         </div>
     </div>
     
-    <button id="uiToggle" class="ui-toggle" title="Toggle UI Style">🎯</button>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -287,7 +195,7 @@
                 this.crossings = [];
                 this.cache = new Map();
                 this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
-                this.uiModes = ['none', 'compass', 'rings'];
+                // Always show rings mode only
                 this.currentModeIndex = 0;
                 this.nearestCrossing = null;
                 this.drawerExpanded = false;
@@ -298,16 +206,7 @@
             init() {
                 this.initMap();
                 this.getUserLocation();
-                this.setupUIToggle();
                 this.setupDrawer();
-            }
-            
-            setupUIToggle() {
-                const toggle = document.getElementById('uiToggle');
-                toggle.addEventListener('click', () => {
-                    this.currentModeIndex = (this.currentModeIndex + 1) % this.uiModes.length;
-                    this.updateDisplayWithMode();
-                });
             }
             
             setupDrawer() {
@@ -510,7 +409,8 @@
                 // Store nearest crossing info
                 this.nearestCrossing = crossingsWithDistance[0];
                 this.allCrossings = crossingsWithDistance;
-                this.updateDisplayWithMode();
+                this.showRingsOverlay();
+                this.updateDrawer();
             }
             
             calculateDistance(lat1, lng1, lat2, lng2) {
@@ -553,7 +453,7 @@
                 return radians * (180 / Math.PI);
             }
             
-            updateDisplayWithMode() {
+            updateDrawer() {
                 if (!this.nearestCrossing) return;
                 
                 const distance = this.nearestCrossing.distance;
@@ -563,28 +463,24 @@
                     `${(distance / 1000).toFixed(1)}km away`;
                 const direction = this.bearingToDirection(bearing);
                 
-                // Hide all overlays first
-                this.hideAllOverlays();
+                const peek = document.getElementById('drawerPeek');
+                const content = document.getElementById('drawerContent');
                 
-                const mode = this.uiModes[this.currentModeIndex];
+                peek.textContent = distanceText;
                 
-                // Update drawer
-                this.updateDrawer(distanceText, `${direction} • ${mode} mode`);
+                const urlParams = new URLSearchParams(window.location.search);
+                const demoNote = urlParams.get('demo') === 'true' ? 
+                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 8px;\">🎯 Demo Mode</div>' : '';
                 
-                // Show appropriate overlay
-                switch(mode) {
-                    case 'compass':
-                        this.showCompassOverlay(bearing);
-                        break;
-                    case 'rings':
-                        this.showRingsOverlay();
-                        break;
-                }
+                content.innerHTML = `
+                    <div class=\"distance-display\">${distanceText}</div>
+                    <div class=\"direction-display\">${direction}</div>
+                    <div class=\"status\">Found ${this.crossings.length} crossing(s) nearby</div>
+                    ${demoNote}
+                `;
             }
             
-            hideAllOverlays() {
-                document.getElementById('compassOverlay').classList.add('hidden');
-                
+            clearRings() {
                 // Remove existing rings
                 this.crossingRings.forEach(ring => this.map.removeLayer(ring));
                 this.crossingRings = [];
@@ -593,23 +489,14 @@
                 document.getElementById('offScreenRings').innerHTML = '';
             }
             
-            showCompassOverlay(bearing) {
-                const overlay = document.getElementById('compassOverlay');
-                const arrow = overlay.querySelector('.compass-arrow');
-                arrow.style.transform = `translate(-50%, -100%) rotate(${bearing}deg)`;
-                overlay.classList.remove('hidden');
-            }
-            
             
             showRingsOverlay() {
                 if (!this.allCrossings) return;
                 
+                this.clearRings();
                 const offScreenContainer = document.getElementById('offScreenRings');
-                offScreenContainer.innerHTML = ''; // Clear existing indicators
                 
-                console.log(`Processing ${this.allCrossings.length} crossings for rings mode`);
-                
-                // Add pulsing rings to each crossing
+                // Add pulsing rings to each of the 3 nearest crossings
                 this.allCrossings.forEach((crossing, index) => {
                     if (index > 2) return; // Show rings for 3 nearest crossings only
                     
@@ -619,8 +506,6 @@
                     // Check if crossing is visible on current map
                     const bounds = this.map.getBounds();
                     const isVisible = bounds.contains([crossing.lat, crossing.lon]);
-                    
-                    console.log(`Crossing ${index + 1}: ${(crossing.distance/1000).toFixed(1)}km, visible: ${isVisible}`);
                     
                     if (isVisible) {
                         // Create on-screen rings for visible crossings
@@ -641,83 +526,62 @@
                             this.crossingRings.push(marker);
                         }
                     } else {
-                        // Create off-screen indicators for crossings outside current view
+                        // Create off-screen concentric rings that expand toward the screen
                         const userPos = this.userPosition;
                         const bearing = this.calculateBearing(
                             userPos.lat, userPos.lng,
                             crossing.lat, crossing.lon
                         );
                         
-                        console.log(`Creating off-screen indicator for crossing ${index + 1}, bearing: ${bearing.toFixed(1)}°`);
-                        
-                        // Position indicator on screen edge in direction of crossing
+                        // Calculate position based on bearing from user position
                         const screenWidth = window.innerWidth;
                         const screenHeight = window.innerHeight;
-                        const margin = 40;
+                        const screenCenter = { x: screenWidth / 2, y: screenHeight / 2 };
                         
                         const angle = bearing * (Math.PI / 180);
-                        let x = screenWidth / 2 + Math.sin(angle) * (screenWidth / 2 - margin);
-                        let y = screenHeight / 2 - Math.cos(angle) * (screenHeight / 2 - margin);
+                        const distance = Math.min(screenWidth, screenHeight) * 0.8; // Distance off-screen
                         
-                        // Clamp to screen edges
-                        x = Math.max(margin, Math.min(screenWidth - margin, x));
-                        y = Math.max(margin, Math.min(screenHeight - margin, y));
+                        const x = screenCenter.x + Math.sin(angle) * distance;
+                        const y = screenCenter.y - Math.cos(angle) * distance;
                         
-                        const indicator = document.createElement('div');
-                        indicator.className = 'ring-indicator';
-                        indicator.style.left = x + 'px';
-                        indicator.style.top = y + 'px';
-                        indicator.style.animationDuration = animationDuration + 's';
-                        indicator.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
-                        
-                        // Add debugging background for visibility
-                        indicator.style.backgroundColor = '#ff4757';
-                        indicator.style.boxShadow = '0 0 0 2px white';
-                        
-                        offScreenContainer.appendChild(indicator);
-                        console.log(`Added off-screen indicator at x:${x.toFixed(1)}, y:${y.toFixed(1)}`);
+                        // Create multiple expanding rings
+                        for (let i = 0; i < 4; i++) {
+                            const ring = document.createElement('div');
+                            ring.className = 'off-screen-ring';
+                            ring.style.left = x + 'px';
+                            ring.style.top = y + 'px';
+                            ring.style.width = '20px';
+                            ring.style.height = '20px';
+                            ring.style.animationDuration = animationDuration + 's';
+                            ring.style.animationDelay = (i * 0.8) + 's';
+                            ring.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
+                            
+                            offScreenContainer.appendChild(ring);
+                        }
                     }
                 });
-                
-                // Force update map bounds check and add test indicator
-                setTimeout(() => {
-                    // Add a test indicator to ensure the system works
-                    const testIndicator = document.createElement('div');
-                    testIndicator.className = 'ring-indicator';
-                    testIndicator.style.left = '50px';
-                    testIndicator.style.top = '100px';
-                    testIndicator.style.backgroundColor = '#00ff00';
-                    testIndicator.style.border = '2px solid white';
-                    testIndicator.title = 'Test indicator';
-                    offScreenContainer.appendChild(testIndicator);
-                    console.log('Added test indicator at top-left');
-                }, 100);
-            }
-            
-            updateDrawer(distance, info) {
-                const peek = document.getElementById('drawerPeek');
-                const content = document.getElementById('drawerContent');
-                
-                peek.textContent = distance;
-                
-                const urlParams = new URLSearchParams(window.location.search);
-                const demoNote = urlParams.get('demo') === 'true' ? 
-                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 8px;\">🎯 Demo Mode</div>' : '';
-                
-                content.innerHTML = `
-                    <div class=\"distance-display\">${distance}</div>
-                    <div class=\"direction-display\">${info}</div>
-                    <div class=\"status\">Found ${this.crossings.length} crossing(s) nearby</div>
-                    ${demoNote}
-                `;
             }
             
             updateStatus(message) {
-                this.updateDrawer('Searching...', message);
+                const peek = document.getElementById('drawerPeek');
+                const content = document.getElementById('drawerContent');
+                
+                peek.textContent = 'Searching...';
+                content.innerHTML = `
+                    <div class=\"distance-display\">Searching...</div>
+                    <div class=\"status\">${message}</div>
+                `;
             }
             
             showError(message) {
-                this.updateDrawer('Error', message);
+                const peek = document.getElementById('drawerPeek');
+                const content = document.getElementById('drawerContent');
+                
+                peek.textContent = 'Error';
+                content.innerHTML = `
+                    <div class=\"distance-display\">Error</div>
+                    <div class=\"status\">${message}</div>
+                `;
             }
         }
         
