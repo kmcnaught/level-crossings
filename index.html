@@ -127,9 +127,9 @@
         
         .off-screen-ring {
             position: absolute;
-            border: 3px solid #ff4757;
+            border: 3px solid #2196F3;
             border-radius: 50%;
-            opacity: 0.7;
+            opacity: 0.8;
             animation: pulse-off-screen 8s infinite;
         }
         
@@ -139,8 +139,8 @@
                 transform: translate(-50%, -50%) scale(0.1);
             }
             100% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(8);
+                opacity: 0.6;
+                transform: translate(-50%, -50%) scale(20);
             }
         }
         
@@ -156,6 +156,70 @@
         }
         
         
+        /* Distance scale bar */
+        .scale-bar {
+            position: fixed;
+            bottom: 120px;
+            left: 20px;
+            z-index: 600;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 4px;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .scale-line {
+            height: 4px;
+            background: #333;
+            margin-bottom: 4px;
+            border-radius: 2px;
+        }
+        
+        .scale-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        /* Ring legend */
+        .ring-legend {
+            position: fixed;
+            bottom: 120px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 600;
+            font-size: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .legend-ring {
+            width: 16px;
+            height: 16px;
+            border: 2px solid;
+            border-radius: 50%;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        
+        .legend-ring.on-screen {
+            border-color: #ff4757;
+        }
+        
+        .legend-ring.off-screen {
+            border-color: #2196F3;
+        }
+        
         .hidden {
             display: none;
         }
@@ -166,6 +230,24 @@
     
     <!-- Off-screen ring indicators -->
     <div id="offScreenRings" class="off-screen-rings"></div>
+    
+    <!-- Distance scale bar -->
+    <div id="scaleBar" class="scale-bar">
+        <div id="scaleLine" class="scale-line"></div>
+        <div id="scaleLabel" class="scale-label">1 km</div>
+    </div>
+    
+    <!-- Ring legend -->
+    <div id="ringLegend" class="ring-legend">
+        <div class="legend-item">
+            <div class="legend-ring on-screen"></div>
+            <span>On-screen</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-ring off-screen"></div>
+            <span>Off-screen</span>
+        </div>
+    </div>
     
     
     <!-- Bottom drawer -->
@@ -229,6 +311,13 @@
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors'
                 }).addTo(this.map);
+                
+                // Update distance scale when map moves or zooms
+                this.map.on('zoomend moveend', () => {
+                    if (this.nearestCrossing) {
+                        this.updateDistanceScale();
+                    }
+                });
             }
             
             getUserLocation() {
@@ -411,6 +500,7 @@
                 this.allCrossings = crossingsWithDistance;
                 this.showRingsOverlay();
                 this.updateDrawer();
+                this.updateDistanceScale();
             }
             
             calculateDistance(lat1, lng1, lat2, lng2) {
@@ -533,13 +623,14 @@
                             crossing.lat, crossing.lon
                         );
                         
-                        // Calculate position based on bearing from user position
+                        // Calculate position way off-screen in the direction of the crossing
                         const screenWidth = window.innerWidth;
                         const screenHeight = window.innerHeight;
                         const screenCenter = { x: screenWidth / 2, y: screenHeight / 2 };
                         
                         const angle = bearing * (Math.PI / 180);
-                        const distance = Math.min(screenWidth, screenHeight) * 0.8; // Distance off-screen
+                        // Place rings much further off-screen so expansion reaches across screen
+                        const distance = Math.max(screenWidth, screenHeight) * 1.5;
                         
                         const x = screenCenter.x + Math.sin(angle) * distance;
                         const y = screenCenter.y - Math.cos(angle) * distance;
@@ -582,6 +673,56 @@
                     <div class=\"distance-display\">Error</div>
                     <div class=\"status\">${message}</div>
                 `;
+            }
+            
+            updateDistanceScale() {
+                const zoom = this.map.getZoom();
+                const center = this.map.getCenter();
+                
+                // Calculate meters per pixel at current zoom level
+                const metersPerPixel = (40075016.686 * Math.cos(center.lat * Math.PI / 180)) / Math.pow(2, zoom + 8);
+                
+                // Calculate target scale bar length (1/4 of smallest screen dimension)
+                const screenWidth = window.innerWidth;
+                const screenHeight = window.innerHeight;
+                const targetPixels = Math.min(screenWidth, screenHeight) / 4;
+                const targetMeters = targetPixels * metersPerPixel;
+                
+                // Find appropriate scale distance and calculate actual pixels needed
+                let scaleDistance, scalePixels, scaleLabel;
+                
+                if (targetMeters < 500) {
+                    // Use meters, round to nice numbers
+                    const roundedMeters = this.roundToNiceNumber(targetMeters, [50, 100, 200, 500]);
+                    scaleDistance = roundedMeters;
+                    scalePixels = scaleDistance / metersPerPixel;
+                    scaleLabel = `${scaleDistance}m`;
+                } else if (targetMeters < 50000) {
+                    // Use kilometers
+                    const km = targetMeters / 1000;
+                    const roundedKm = this.roundToNiceNumber(km, [0.5, 1, 2, 5, 10, 20]);
+                    scaleDistance = roundedKm * 1000;
+                    scalePixels = scaleDistance / metersPerPixel;
+                    scaleLabel = roundedKm < 1 ? `${roundedKm * 1000}m` : `${roundedKm}km`;
+                } else {
+                    // Use miles for very zoomed out
+                    const miles = targetMeters / 1609.34;
+                    const roundedMiles = this.roundToNiceNumber(miles, [1, 2, 5, 10, 20, 50]);
+                    scaleDistance = roundedMiles * 1609.34;
+                    scalePixels = scaleDistance / metersPerPixel;
+                    scaleLabel = `${roundedMiles} mile${roundedMiles > 1 ? 's' : ''}`;
+                }
+                
+                // Update the scale bar
+                document.getElementById('scaleLine').style.width = Math.round(scalePixels) + 'px';
+                document.getElementById('scaleLabel').textContent = scaleLabel;
+            }
+            
+            roundToNiceNumber(value, options) {
+                // Find the closest "nice" number from the options array
+                return options.reduce((prev, curr) => 
+                    Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
+                );
             }
         }
         
