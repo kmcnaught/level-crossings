@@ -127,7 +127,7 @@
         
         .off-screen-ring {
             position: absolute;
-            border: 3px solid #2196F3;
+            border: 0.5px solid #2196F3;
             border-radius: 50%;
             opacity: 0.8;
             animation: pulse-off-screen 8s infinite;
@@ -139,7 +139,7 @@
                 transform: translate(-50%, -50%) scale(0.1);
             }
             100% {
-                opacity: 0.5;
+                opacity: 0.2;
                 transform: translate(-50%, -50%) scale(50);
             }
         }
@@ -273,6 +273,7 @@
                 this.userMarker = null;
                 this.crossingMarkers = [];
                 this.crossingRings = [];
+                this.offScreenRings = []; // Track off-screen rings separately
                 this.userPosition = null;
                 this.crossings = [];
                 this.cache = new Map();
@@ -316,6 +317,7 @@
                 this.map.on('zoomend moveend', () => {
                     if (this.nearestCrossing) {
                         this.updateDistanceScale();
+                        this.updateOffScreenRingPositions();
                     }
                 });
             }
@@ -575,7 +577,8 @@
                 this.crossingRings.forEach(ring => this.map.removeLayer(ring));
                 this.crossingRings = [];
                 
-                // Clear off-screen indicators
+                // Clear off-screen indicators (but keep reference for position updates)
+                this.offScreenRings = [];
                 document.getElementById('offScreenRings').innerHTML = '';
             }
             
@@ -642,6 +645,11 @@
                         console.log(`Off-screen ring position: x=${x.toFixed(1)}, y=${y.toFixed(1)}, screen: ${screenWidth}x${screenHeight}`);
                         
                         // Create multiple expanding rings
+                        const ringGroup = {
+                            crossing: crossing,
+                            elements: []
+                        };
+                        
                         for (let i = 0; i < 4; i++) {
                             const ring = document.createElement('div');
                             ring.className = 'off-screen-ring';
@@ -652,15 +660,61 @@
                             ring.style.animationDuration = animationDuration + 's';
                             ring.style.animationDelay = (i * 0.8) + 's';
                             ring.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
-                            ring.style.border = '3px solid #2196F3'; // Force blue color
+                            ring.style.border = '0.5px solid #2196F3'; // Force blue color
                             ring.style.opacity = '0.8'; // Force visibility
                             
                             offScreenContainer.appendChild(ring);
+                            ringGroup.elements.push(ring);
                             console.log(`Added off-screen ring ${i + 1} for crossing ${index + 1}`);
                         }
+                        
+                        this.offScreenRings.push(ringGroup);
                     }
                 });
                 
+            }
+            
+            updateOffScreenRingPositions() {
+                if (!this.offScreenRings.length || !this.userPosition) return;
+                
+                const screenWidth = window.innerWidth;
+                const screenHeight = window.innerHeight;
+                const screenCenter = { x: screenWidth / 2, y: screenHeight / 2 };
+                
+                this.offScreenRings.forEach(ringGroup => {
+                    const crossing = ringGroup.crossing;
+                    
+                    // Check if crossing is still off-screen
+                    const bounds = this.map.getBounds();
+                    const isVisible = bounds.contains([crossing.lat, crossing.lon]);
+                    
+                    if (!isVisible) {
+                        // Recalculate position
+                        const bearing = this.calculateBearing(
+                            this.userPosition.lat, this.userPosition.lng,
+                            crossing.lat, crossing.lon
+                        );
+                        
+                        const angle = bearing * (Math.PI / 180);
+                        const distance = Math.max(screenWidth, screenHeight) * 0.6;
+                        
+                        const x = screenCenter.x + Math.sin(angle) * distance;
+                        const y = screenCenter.y - Math.cos(angle) * distance;
+                        
+                        // Update position of all rings in this group without affecting animation
+                        ringGroup.elements.forEach(ring => {
+                            ring.style.left = x + 'px';
+                            ring.style.top = y + 'px';
+                        });
+                    } else {
+                        // Crossing is now visible, remove off-screen rings
+                        ringGroup.elements.forEach(ring => ring.remove());
+                        const index = this.offScreenRings.indexOf(ringGroup);
+                        if (index > -1) {
+                            this.offScreenRings.splice(index, 1);
+                        }
+                    }
+                });
             }
             
             updateStatus(message) {
