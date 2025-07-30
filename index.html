@@ -502,6 +502,11 @@
                     this.map.setView([this.userPosition.lat, this.userPosition.lng], this.map.getZoom());
                 }
                 
+                // Update drawer frequently with live distance to nearest crossing
+                if (this.nearestCrossing) {
+                    this.updateDrawerWithLiveDistance();
+                }
+                
                 // Periodically search for new level crossings as we move
                 if (this.demoStep % 25 === 0) { // Every 25 steps (~12.5 seconds)
                     this.findLevelCrossings();
@@ -805,6 +810,59 @@
                     <div class=\"status\">Found ${this.crossings.length} crossing(s) nearby</div>
                     ${demoNote}
                 `;
+            }
+            
+            updateDrawerWithLiveDistance() {
+                if (!this.nearestCrossing) return;
+                
+                // Calculate live distance to nearest crossing
+                const liveDistance = this.calculateDistance(
+                    this.userPosition.lat, this.userPosition.lng,
+                    this.nearestCrossing.lat, this.nearestCrossing.lon
+                );
+                
+                const liveBearing = this.calculateBearing(
+                    this.userPosition.lat, this.userPosition.lng,
+                    this.nearestCrossing.lat, this.nearestCrossing.lon
+                );
+                
+                // Round to neat numbers: 1km, 2km, 3km, 4km, 5km, 10km, 15km, 20km, etc.
+                const roundedDistance = this.roundToNeatDistance(liveDistance);
+                const direction = this.bearingToDirection(liveBearing);
+                
+                const peek = document.getElementById('drawerPeek');
+                const content = document.getElementById('drawerContent');
+                const demoNote = this.isDemoMode ? 
+                    '<div style=\"font-size: 12px; color: #e67e22; margin-top: 8px;\">🎯 Demo Mode</div>' : '';
+                
+                peek.textContent = roundedDistance;
+                
+                content.innerHTML = `
+                    <div class=\"distance-display\">${roundedDistance}</div>
+                    <div class=\"direction-display\">${direction}</div>
+                    <div class=\"status\">Found ${this.crossings.length} crossing(s) nearby</div>
+                    ${demoNote}
+                `;
+            }
+            
+            roundToNeatDistance(distanceInMeters) {
+                if (distanceInMeters < 1000) {
+                    // Under 1km: round to nearest 100m
+                    const rounded = Math.round(distanceInMeters / 100) * 100;
+                    return `${rounded}m away`;
+                } else if (distanceInMeters < 5000) {
+                    // 1-5km: round to nearest km
+                    const km = Math.round(distanceInMeters / 1000);
+                    return `${km}km away`;
+                } else if (distanceInMeters < 20000) {
+                    // 5-20km: round to nearest 5km (5, 10, 15, 20)
+                    const km = Math.round(distanceInMeters / 5000) * 5;
+                    return `${km}km away`;
+                } else {
+                    // 20km+: round to nearest 10km (20, 30, 40, 50)
+                    const km = Math.round(distanceInMeters / 10000) * 10;
+                    return `${km}km away`;
+                }
             }
             
             clearRings() {
