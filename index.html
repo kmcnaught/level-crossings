@@ -139,8 +139,8 @@
                 transform: translate(-50%, -50%) scale(0.1);
             }
             100% {
-                opacity: 0.6;
-                transform: translate(-50%, -50%) scale(20);
+                opacity: 0.5;
+                transform: translate(-50%, -50%) scale(50);
             }
         }
         
@@ -597,6 +597,8 @@
                     const bounds = this.map.getBounds();
                     const isVisible = bounds.contains([crossing.lat, crossing.lon]);
                     
+                    console.log(`Crossing ${index + 1}: ${(crossing.distance/1000).toFixed(1)}km, visible: ${isVisible}, lat: ${crossing.lat}, lon: ${crossing.lon}`);
+                    
                     if (isVisible) {
                         // Create on-screen rings for visible crossings
                         for (let i = 0; i < 4; i++) {
@@ -623,17 +625,21 @@
                             crossing.lat, crossing.lon
                         );
                         
+                        console.log(`Creating off-screen rings for crossing ${index + 1}, bearing: ${bearing.toFixed(1)}°`);
+                        
                         // Calculate position way off-screen in the direction of the crossing
                         const screenWidth = window.innerWidth;
                         const screenHeight = window.innerHeight;
                         const screenCenter = { x: screenWidth / 2, y: screenHeight / 2 };
                         
                         const angle = bearing * (Math.PI / 180);
-                        // Place rings much further off-screen so expansion reaches across screen
-                        const distance = Math.max(screenWidth, screenHeight) * 1.5;
+                        // Place rings at screen edge so expansion reaches across screen
+                        const distance = Math.max(screenWidth, screenHeight) * 0.6;
                         
                         const x = screenCenter.x + Math.sin(angle) * distance;
                         const y = screenCenter.y - Math.cos(angle) * distance;
+                        
+                        console.log(`Off-screen ring position: x=${x.toFixed(1)}, y=${y.toFixed(1)}, screen: ${screenWidth}x${screenHeight}`);
                         
                         // Create multiple expanding rings
                         for (let i = 0; i < 4; i++) {
@@ -641,16 +647,20 @@
                             ring.className = 'off-screen-ring';
                             ring.style.left = x + 'px';
                             ring.style.top = y + 'px';
-                            ring.style.width = '20px';
-                            ring.style.height = '20px';
+                            ring.style.width = '30px';
+                            ring.style.height = '30px';
                             ring.style.animationDuration = animationDuration + 's';
                             ring.style.animationDelay = (i * 0.8) + 's';
                             ring.title = `Level crossing ${(crossing.distance / 1000).toFixed(1)}km away`;
+                            ring.style.border = '3px solid #2196F3'; // Force blue color
+                            ring.style.opacity = '0.8'; // Force visibility
                             
                             offScreenContainer.appendChild(ring);
+                            console.log(`Added off-screen ring ${i + 1} for crossing ${index + 1}`);
                         }
                     }
                 });
+                
             }
             
             updateStatus(message) {
