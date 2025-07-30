@@ -113,6 +113,13 @@
             }
             
             getUserLocation() {
+                // Check for demo mode
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('demo') === 'true') {
+                    this.useDemoLocation();
+                    return;
+                }
+                
                 if (!navigator.geolocation) {
                     this.showError('Geolocation not supported');
                     return;
@@ -129,6 +136,21 @@
                     (error) => this.onLocationError(error),
                     options
                 );
+            }
+            
+            useDemoLocation() {
+                // Demo location: Near Ashford, Kent (has several level crossings nearby)
+                const demoPosition = {
+                    coords: {
+                        latitude: 51.1464,
+                        longitude: 0.8750
+                    }
+                };
+                
+                this.updateStatus('Using demo location near Ashford, Kent...');
+                setTimeout(() => {
+                    this.onLocationSuccess(demoPosition);
+                }, 1000);
             }
             
             onLocationSuccess(position) {
@@ -317,10 +339,16 @@
             updateDisplay(distance, direction) {
                 const info = document.getElementById('info');
                 info.className = 'info-overlay';
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const demoNote = urlParams.get('demo') === 'true' ? 
+                    '<div style="font-size: 12px; color: #e67e22; margin-top: 5px;">🎯 Demo Mode - Add ?demo=true to URL</div>' : '';
+                
                 info.innerHTML = `
                     <div class="distance-display">${distance}</div>
                     <div class="direction-display">${direction}</div>
                     <div class="status">Found ${this.crossings.length} crossing(s) nearby</div>
+                    ${demoNote}
                 `;
             }
             
