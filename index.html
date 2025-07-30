@@ -885,28 +885,29 @@
                 // Get current map center for distance calculations
                 const mapCenter = this.map.getCenter();
                 
-                // Calculate distances from map center and get 3 nearest
+                // Calculate distances from map center and get up to 6 nearest
                 const crossingsFromMapCenter = this.allCrossings.map(crossing => {
                     const distanceFromCenter = this.calculateDistance(
                         mapCenter.lat, mapCenter.lng,
                         crossing.lat, crossing.lon
                     );
                     return { ...crossing, distanceFromCenter };
-                }).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter).slice(0, 3);
+                }).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
                 
-                // Add pulsing rings to each of the 3 nearest crossings to map center
+                // Add pulsing rings to up to 6 nearest crossings to map center (only if on-screen)
+                let onScreenCount = 0;
                 crossingsFromMapCenter.forEach((crossing, index) => {
-                    
-                    const urgency = Math.max(0.2, 1 - (crossing.distance / 80000)); // Scale for 50-mile range
-                    const animationDuration = 10 - (urgency * 4); // Much slower: 6-10 seconds
-                    
                     // Check if crossing is visible on current map
                     const bounds = this.map.getBounds();
                     const isVisible = bounds.contains([crossing.lat, crossing.lon]);
                     
                     console.log(`Crossing ${index + 1} of ${crossingsFromMapCenter.length}: ${(crossing.distance/1000).toFixed(1)}km, visible: ${isVisible}, lat: ${crossing.lat}, lon: ${crossing.lon}`);
                     
-                    if (isVisible) {
+                    const urgency = Math.max(0.2, 1 - (crossing.distance / 80000)); // Scale for 50-mile range
+                    const animationDuration = 10 - (urgency * 4); // Much slower: 6-10 seconds
+                    
+                    if (isVisible && onScreenCount < 6) {
+                        onScreenCount++;
                         // Create on-screen rings for visible crossings (2 animated rings per crossing)
                         for (let i = 0; i < 2; i++) {
                             const ring = L.divIcon({
@@ -924,7 +925,7 @@
                             
                             this.crossingRings.push(marker);
                         }
-                    } else {
+                    } else if (index < 3) { // Only show off-screen rings for closest 3 crossings
                         // Create off-screen concentric rings that expand toward the screen
                         const mapCenter = this.map.getCenter();
                         const bearing = this.calculateBearing(
