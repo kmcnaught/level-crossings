@@ -225,11 +225,6 @@
             border-color: #4CAF50;
         }
         
-        .location-btn.demo {
-            background: #FF9800;
-            color: white;
-            border-color: #FF9800;
-        }
     </style>
 </head>
 <body>
@@ -240,9 +235,8 @@
     
     <!-- Location controls -->
     <div class="location-controls">
-        <button id="locateBtn" class="location-btn" title="Find my location">📍</button>
-        <button id="trackBtn" class="location-btn" title="Track my location">📡</button>
-        <button id="demoBtn" class="location-btn" title="Moving demo">🚂</button>
+        <button id="trackBtn" class="location-btn" title="Track my location">📍</button>
+        <button id="radarBtn" class="location-btn" title="Toggle radar rings">🎯</button>
     </div>
     
     <!-- Distance scale bar -->
@@ -290,6 +284,7 @@
                 this.isDemoMode = false;
                 this.demoInterval = null;
                 this.userPanned = false;
+                this.radarEnabled = true; // Radar rings enabled by default
                 
                 this.init();
             }
@@ -316,13 +311,11 @@
             }
             
             setupLocationControls() {
-                const locateBtn = document.getElementById('locateBtn');
                 const trackBtn = document.getElementById('trackBtn');
-                const demoBtn = document.getElementById('demoBtn');
+                const radarBtn = document.getElementById('radarBtn');
                 
-                locateBtn.addEventListener('click', () => this.relocateToCurrentPosition());
                 trackBtn.addEventListener('click', () => this.toggleTracking());
-                demoBtn.addEventListener('click', () => this.toggleDemoMode());
+                radarBtn.addEventListener('click', () => this.toggleRadar());
             }
             
             relocateToCurrentPosition() {
@@ -357,6 +350,8 @@
                 if (this.isTracking) {
                     this.stopTracking();
                 } else {
+                    // First get/center location, then start tracking
+                    this.relocateToCurrentPosition();
                     this.startTracking();
                 }
             }
@@ -418,19 +413,47 @@
                     .bindPopup('Your location');
             }
             
-            toggleDemoMode() {
-                if (this.isDemoMode) {
-                    this.stopDemoMode();
+            toggleRadar() {
+                this.radarEnabled = !this.radarEnabled;
+                const radarBtn = document.getElementById('radarBtn');
+                
+                if (this.radarEnabled) {
+                    radarBtn.classList.add('active');
+                    // Reinitialize everything when turning radar back on
+                    this.reinitialize();
                 } else {
-                    this.startDemoMode();
+                    radarBtn.classList.remove('active');
+                    // Clear all rings when turning radar off
+                    this.clearRings();
                 }
             }
+            
+            reinitialize() {
+                // Clear existing state
+                this.clearRings();
+                this.crossingMarkers.forEach(marker => this.map.removeLayer(marker));
+                this.crossingMarkers = [];
+                this.crossings = [];
+                this.allCrossings = [];
+                this.nearestCrossing = null;
+                
+                // Clear cache to force fresh data
+                this.cache.clear();
+                
+                // Reset position and find crossings again
+                if (this.userPosition) {
+                    this.findLevelCrossings();
+                } else {
+                    // If no position, get location again
+                    this.getUserLocation();
+                }
+            }
+            
             
             startDemoMode() {
                 this.isDemoMode = true;
                 this.stopTracking(); // Stop real GPS tracking if active
                 this.userPanned = false; // Allow demo tracking to control map
-                document.getElementById('demoBtn').classList.add('demo');
                 
                 // Train route from Ashford to Canterbury (about 10 miles)
                 // This follows the railway line with several level crossings
@@ -461,7 +484,6 @@
             
             stopDemoMode() {
                 this.isDemoMode = false;
-                document.getElementById('demoBtn').classList.remove('demo');
                 
                 if (this.demoInterval) {
                     clearInterval(this.demoInterval);
@@ -557,7 +579,7 @@
                 // Check for demo mode
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('demo') === 'true') {
-                    this.useDemoLocation();
+                    this.startDemoMode();
                     return;
                 }
                 
@@ -877,7 +899,7 @@
             
             
             showRingsOverlay() {
-                if (!this.allCrossings) return;
+                if (!this.allCrossings || !this.radarEnabled) return;
                 
                 this.clearRings();
                 const offScreenContainer = document.getElementById('offScreenRings');
